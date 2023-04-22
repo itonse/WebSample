@@ -8,9 +8,14 @@ import org.springframework.web.bind.annotation.*;
 @RestController    // 레스트컨트롤러: 응답값으로 Rest API 요청에 대한 응답(주로 JSON)을 주도록 함
 public class SampleController {
     // 스프링 MVC 기본 HTTP 요청 매핑
-    @GetMapping ("/order/{orderId}") // orderId로 987 사용  // 초기에 지구본 눌러서 http 클라이언트 생성하기
-    public String getOrder(@PathVariable("orderId") String id) {  // 파라미터 넘기기: PathVariable
-        log.info("Get some order : " + id);   // 클래스의 위치 등 여러가지 정보를 알려주고, 아래 콘솔에 출력됨
+    @GetMapping ("/order/{orderId}") // {orderId}로 987 사용  // 초기에 지구본 눌러서 http 클라이언트 생성하기
+    public String getOrder(@PathVariable("orderId") String id) throws IllegalAccessException {  // 파라미터 넘기기: PathVariable
+        log.info("Get some order : " + id);   // 겟 썸 오더 로그찍음
+
+        if ("500".equals(id)) {
+            throw new IllegalAccessException("500 is not valid orderId.");
+        }
+
         return "orderId:" + id + ", " + "orderAmount:1000";   // path 값도 받아올 수 있음
     }
 
