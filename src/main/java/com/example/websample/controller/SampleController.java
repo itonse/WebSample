@@ -1,22 +1,80 @@
 package com.example.websample.controller;
 
+import com.example.websample.dto.ErrorResponse;
+import com.example.websample.exception.ErrorCode;
+import com.example.websample.exception.WebSampleException;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.sql.SQLIntegrityConstraintViolationException;
 
 @Slf4j   // 아래 log 등 편의성을 제공해주는 라이브러리
 @RestController    // 레스트컨트롤러: 응답값으로 Rest API 요청에 대한 응답(주로 JSON)을 주도록 함
 public class SampleController {
     // 스프링 MVC 기본 HTTP 요청 매핑
     @GetMapping ("/order/{orderId}") // {orderId}로 987 사용  // 초기에 지구본 눌러서 http 클라이언트 생성하기
-    public String getOrder(@PathVariable("orderId") String id) throws IllegalAccessException {  // 파라미터 넘기기: PathVariable
+    public String getOrder(@PathVariable("orderId") String id) throws IllegalAccessException, SQLIntegrityConstraintViolationException {  // [PathVariable: 파라미터 넘기기] orderId 를 id에
         log.info("Get some order : " + id);   // 겟 썸 오더 로그찍음
 
         if ("500".equals(id)) {
-            throw new IllegalAccessException("500 is not valid orderId.");
+            throw new WebSampleException(
+                    ErrorCode.TOO_BIG_ID_ERROR,
+                    "500 is too big orderId."
+            );
         }
 
+        if ("3".equals(id)) {
+            throw new WebSampleException(
+                    ErrorCode.TOO_SMALL_ID_ERROR,
+                    "3 is too small orderId."
+            );
+        }
+
+        if ("4".equals(id)) {  // DB에 유니크키가 걸려있거나, 중복되면 안되는 데이터를 시도했을 때 발생
+            throw new SQLIntegrityConstraintViolationException(
+                    "Duplicted insertion was tried."
+            );
+        }
         return "orderId:" + id + ", " + "orderAmount:1000";   // path 값도 받아올 수 있음
+    }
+
+
+    // 컨트롤러 내에서 직접 익셉션 핸들링
+    // 현업에서는 보통 커스텀 익셉션을 만들어서 (enum 형태) 에러처리 하는것을 선호.
+    @ExceptionHandler(IllegalAccessException.class)  // 이렇게 특정 익셉션들은 직접 핸들러를 만들어서 처리.
+    public ResponseEntity<ErrorResponse> handleIllegalAccessException(  // ResponseEntity로 감싸기: 헤더, status 지정 등 다양한 기능 추가
+            IllegalAccessException e) {  // 일레갈 익센션을 인자로 받음
+        log.error("IllegalAccessException is occurred.", e);  // 익셉션 발생했다는 로그 찍음
+
+        return ResponseEntity   // 여러가지 생성하는 방법들 제공: 빌더 사용
+                .status(HttpStatus.FORBIDDEN)  // 잘못된 접근이라서 넣어줌. 응답의 코드값이 200이 아닌 403으로 내려감
+                .body(new ErrorResponse(ErrorCode.TOO_BIG_ID_ERROR,
+                "IllegalAccessException is occurred."));   // 웹화면에 깔끔하게 json(키:값)으로 응답값이 들어감
+    }
+
+    @ExceptionHandler(WebSampleException.class)
+    public ResponseEntity<ErrorResponse> handleWebSampleException(
+            WebSampleException e) {   // 웹샘플익센션을 받음
+        log.error("WebSampleException is occurred.", e);  // 웹샘플익셉션 발생!
+
+        return ResponseEntity
+                .status(HttpStatus.INSUFFICIENT_STORAGE)  //
+                .body(new ErrorResponse(e.getErrorCode(),  // 정확한 에러코드를 가져옴.
+                        "WebSampleException is occurred."));
+    }
+
+    @ExceptionHandler(Exception.class)  // 모든 예외의 부모: 그 외에 나머지 익셉션들을 전부 다 처리 해줌. 무조건 필요(최후의 보루)
+    public ResponseEntity<ErrorResponse> handleException(
+            Exception e) {   // 웹샘플익센션을 받음
+        log.error("Exception is occurred.", e);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)  //
+                .body(new ErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR,  // 정확한 에러코드를 가져옴.
+                        "Exception is occurred."));
     }
 
     @DeleteMapping ("/order/{orderId}")   // ID 987번을 지우는 주문
